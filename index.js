@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
-import fetch from "node-fetch";
-import cheerio from 'cheerio';
-import playSound from 'play-sound';
-import notifier from 'node-notifier';
-import dotenv from 'dotenv';
-dotenv.config();
+import fetch from "node-fetch"
+import cheerio from 'cheerio'
+import playSound from 'play-sound'
+import dotenv from 'dotenv'
+import { Telegraf } from "telegraf"
+dotenv.config()
 
 
 const USERNAME = process.env.USERNAME
@@ -13,6 +13,7 @@ const PASSWORD = process.env.PASSWORD
 const SCHEDULE_ID = process.env.SCHEDULE_ID
 const FACILITY_ID = process.env.FACILITY_ID
 
+const bot = new Telegraf(process.env.BOT_TOKEN)
 
 const BASE_URI = 'https://ais.usvisa-info.com/pt-br/niv'
 
@@ -42,19 +43,22 @@ async function main(currentBookedDate) {
           for (const date of availableDates) {
             datesString += `- ${date}\n`
           }
-          log(datesString);
+          log(datesString)
           currentBookedDate = availableDates[0]
           const time = await checkAvailableTime(sessionHeaders, currentBookedDate)
+
+          if (process.env.BOT_ENABLED) {
+            sendTelegramMessage(`🎉🎉🎉 Data disponível para reserva do visto 🎉🎉🎉\n📅 Data: ${currentBookedDate}\n⏰ Horário: ${time}\n🏃‍♂️🏃‍♂️🏃‍♂️🏃‍♂️`)
+          }
           
-          sendNotification(`Data disponível para reserva: ${currentBookedDate}`)
-          log(`Date for booking available for ${currentBookedDate}`)
+          log(`Date for booking available for ${currentBookedDate} at ${time}`)
           break
         } else {
           log(`No dates available before ${currentBookedDate}`)
         }
       }
 
-      await sleep(45, 180)
+      await sleep(60, 230)
     }
 
   } catch(err) {
@@ -65,33 +69,28 @@ async function main(currentBookedDate) {
   }
 }
 
-function sendNotification(message) {
-  notifier.notify({
-    title: 'Visto Disponível',
-    message: message,
-    sound: false,
-  });
-}
-
 function playAlertSound(durationInSeconds = 60, intervalInSeconds = 2) {
-  const player = playSound();
-  const soundFilePath = '/System/Library/Sounds/Funk.aiff';
-  let elapsedTime = 0;
+  const player = playSound()
+  const soundFilePath = '/System/Library/Sounds/Funk.aiff'
+  let elapsedTime = 0
 
   const playInterval = setInterval(() => {
     player.play(soundFilePath, (err) => {
       if (err) {
-        console.error(`Erro ao tocar o som: ${err}`);
+        console.error(`Erro ao tocar o som: ${err}`)
       }
-    });
+    })
 
-    elapsedTime += intervalInSeconds;
+    elapsedTime += intervalInSeconds
     if (elapsedTime >= durationInSeconds) {
-      clearInterval(playInterval);
+      clearInterval(playInterval)
     }
-  }, intervalInSeconds * 1000);
+  }, intervalInSeconds * 1000)
 }
 
+async function sendTelegramMessage(message) {
+  bot.telegram.sendMessage(process.env.CHAT_ID, message)
+}
 
 async function login() {
   log(`Logging in`)
@@ -150,7 +149,7 @@ function handleErrors(response) {
   const errorMessage = response['error']
 
   if (errorMessage) {
-    throw new Error(errorMessage);
+    throw new Error(errorMessage)
   }
 
   return response
@@ -160,7 +159,7 @@ async function extractHeaders(res) {
   const cookies = extractRelevantCookies(res)
 
   const html = await res.text()
-  const $ = cheerio.load(html);
+  const $ = cheerio.load(html)
   const csrfToken = $('meta[name="csrf-token"]').attr('content')
 
   return {
@@ -191,16 +190,16 @@ function parseCookies(cookies) {
 }
 
 function sleep(minSeconds, maxSeconds) {
-  const randomSleepTime = Math.floor(Math.random() * (maxSeconds - minSeconds + 1) + minSeconds) * 1000;
+  const randomSleepTime = Math.floor(Math.random() * (maxSeconds - minSeconds + 1) + minSeconds) * 1000
   return new Promise((resolve) => {
-    setTimeout(resolve, randomSleepTime);
-  });
+    setTimeout(resolve, randomSleepTime)
+  })
 }
 
 function log(message) {
   console.log(`[${new Date().toISOString()}]`, message)
 }
 
-const args = process.argv.slice(2);
+const args = process.argv.slice(2)
 const currentBookedDate = args[0]
 main(currentBookedDate)
